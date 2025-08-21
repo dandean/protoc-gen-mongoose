@@ -24,14 +24,21 @@ get_timestamp() {
     date '+%Y-%m-%d %H:%M:%S'
 }
 
-# Function to check if file exists
+# Function to check if file exists and send notification
 check_file() {
     if [ -f "$FILENAME" ]; then
         echo "true"
+        # Send push notification when file exists
+        osascript -e "display notification \"File '$BASENAME' exists\" with title \"File Watcher\" sound name \"default\""
+        return 0
     else
         echo "false"
+        return 1
     fi
 }
+
+# Send startup notification
+osascript -e "display notification \"Started watching '$BASENAME'\" with title \"File Watcher\" subtitle \"Script Started\" sound name \"default\""
 
 # Print initial state
 echo "$(get_timestamp) $(check_file)"
