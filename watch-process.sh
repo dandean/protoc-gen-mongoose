@@ -1,16 +1,82 @@
 #!/bin/bash
 
-# Usage: ./watch-process.sh <process_name>
-# Example: ./watch-process.sh nginx
+# Process Watcher Script
+#
+# DESCRIPTION:
+#   Monitors processes by exact name match and displays visual process trees.
+#   Shows complete ancestry from root (PID 1) down to target process and its children.
+#   Prints timestamped status changes and sends macOS push notifications.
+#   Uses polling to check for process state changes every 0.5 seconds.
+#
+# USAGE:
+#   ./watch-process.sh <process_name>
+#
+# EXAMPLES:
+#   ./watch-process.sh git              # Watch for processes named exactly "git"
+#   ./watch-process.sh nginx            # Watch for processes named exactly "nginx"
+#   ./watch-process.sh python3          # Watch for processes named exactly "python3"
+#
+# OUTPUT FORMAT:
+#   YYYY-MM-DD HH:MM:SS false                    # When no processes found
+#   YYYY-MM-DD HH:MM:SS true                     # When processes found
+#   --- Visual Process Trees ---                 # Followed by tree display
+#   Full process tree (root to target and children):
+#   ├─ 1 launchd /sbin/launchd
+#     ├─ 500 loginwindow ...
+#       ├─ 12345 git git status *** TARGET ***
+#         ├─ 12346 less less
+#
+# PROCESS MATCHING:
+#   - Uses exact name matching (pgrep -x) - not partial matches
+#   - Will NOT match "gitstatusd" when searching for "git"
+#   - Excludes the script's own process from results
+#
+# PROCESS TREE DISPLAY:
+#   - Shows complete ancestry from root process (PID 1) to target
+#   - Marks target process with "*** TARGET ***"
+#   - Shows all child processes of the target
+#   - Uses pstree if available, otherwise custom visual tree
+#   - Displays PID, command name, and full command line
+#
+# NOTIFICATIONS:
+#   - Startup: "Started watching process 'name'" when script begins
+#   - Process found: "Found X 'name' process(es)" when processes appear
+#   - Only sends notifications on state changes (not every iteration)
+#
+# REQUIREMENTS:
+#   - macOS (for osascript notifications)
+#   - pstree (optional, for enhanced tree display: brew install pstree)
+#
+# BEHAVIOR:
+#   - Prints initial process state immediately
+#   - Only prints when process state changes (appears/disappears)
+#   - Polls every 0.5 seconds for changes
+#   - Runs continuously until stopped with Ctrl+C
+#   - Notifications sent only when state transitions occur
 
 if [ $# -eq 0 ]; then
+    echo "Process Watcher - Monitor processes with visual trees and notifications"
+    echo ""
     echo "Usage: $0 <process_name>"
-    echo "Example: $0 nginx"
+    echo ""
+    echo "Examples:"
+    echo "  $0 git              # Watch for processes named exactly 'git'"
+    echo "  $0 nginx            # Watch for processes named exactly 'nginx'"
+    echo "  $0 python3          # Watch for processes named exactly 'python3'"
+    echo ""
+    echo "Features:"
+    echo "  - Exact name matching (not partial)"
+    echo "  - Complete process ancestry trees"
+    echo "  - Real-time notifications"
+    echo "  - Visual process hierarchy display"
+    echo ""
+    echo "Optional:"
+    echo "  - pstree (install with: brew install pstree)"
+    echo ""
     exit 1
 fi
 
 PROCESS_NAME="$1"
-LAST_STATE=""
 LAST_NOTIFIED=""
 
 # Function to get current timestamp

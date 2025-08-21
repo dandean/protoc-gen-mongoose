@@ -1,11 +1,51 @@
 #!/bin/bash
 
-# Usage: ./watch-file.sh <filename>
-# Example: ./watch-file.sh myfile.txt
+# File Watcher Script
+#
+# DESCRIPTION:
+#   Monitors a specific file for creation/deletion events using filesystem events.
+#   Prints timestamped status changes and sends macOS push notifications.
+#   Uses fswatch for real-time monitoring instead of polling.
+#
+# USAGE:
+#   ./watch-file.sh <filename>
+#
+# EXAMPLES:
+#   ./watch-file.sh myfile.txt          # Watch for myfile.txt in current directory
+#   ./watch-file.sh /tmp/status.log     # Watch for absolute path
+#   ./watch-file.sh ../config.json      # Watch for relative path
+#
+# OUTPUT FORMAT:
+#   YYYY-MM-DD HH:MM:SS true    # When file exists
+#   YYYY-MM-DD HH:MM:SS false   # When file doesn't exist
+#
+# NOTIFICATIONS:
+#   - Startup: "Started watching 'filename'" when script begins
+#   - File exists: "File 'filename' exists" when file is detected
+#
+# REQUIREMENTS:
+#   - macOS (for osascript notifications)
+#   - fswatch (install with: brew install fswatch)
+#
+# BEHAVIOR:
+#   - Prints initial file state immediately
+#   - Only prints when file state changes (appears/disappears)
+#   - Responds instantly to filesystem events (no polling delay)
+#   - Runs continuously until stopped with Ctrl+C
 
 if [ $# -eq 0 ]; then
+    echo "File Watcher - Monitor file creation/deletion with notifications"
+    echo ""
     echo "Usage: $0 <filename>"
-    echo "Example: $0 myfile.txt"
+    echo ""
+    echo "Examples:"
+    echo "  $0 myfile.txt          # Watch for myfile.txt in current directory"
+    echo "  $0 /tmp/status.log     # Watch for absolute path"
+    echo "  $0 ../config.json      # Watch for relative path"
+    echo ""
+    echo "Requirements:"
+    echo "  - fswatch (install with: brew install fswatch)"
+    echo ""
     exit 1
 fi
 
