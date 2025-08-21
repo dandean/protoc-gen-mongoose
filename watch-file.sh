@@ -9,8 +9,15 @@ if [ $# -eq 0 ]; then
     exit 1
 fi
 
+# Check if fswatch is available
+if ! command -v fswatch >/dev/null 2>&1; then
+    echo "Error: fswatch is not installed. Install with: brew install fswatch"
+    exit 1
+fi
+
 FILENAME="$1"
-LAST_STATE=""
+DIRNAME=$(dirname "$FILENAME")
+BASENAME=$(basename "$FILENAME")
 
 # Function to get current timestamp
 get_timestamp() {
@@ -26,21 +33,13 @@ check_file() {
     fi
 }
 
-# Initial state check
-CURRENT_STATE=$(check_file)
-LAST_STATE="$CURRENT_STATE"
-echo "$(get_timestamp) $CURRENT_STATE"
+# Print initial state
+echo "$(get_timestamp) $(check_file)"
 
-# Main watch loop
-while true; do
-    CURRENT_STATE=$(check_file)
-    
-    # Only print if state changed
-    if [ "$CURRENT_STATE" != "$LAST_STATE" ]; then
-        echo "$(get_timestamp) $CURRENT_STATE"
-        LAST_STATE="$CURRENT_STATE"
+# Watch the directory for changes and filter for our specific file
+fswatch -0 "$DIRNAME" | while IFS= read -r -d '' event; do
+    # Check if the event involves our target file
+    if [[ "$event" == *"$BASENAME"* ]]; then
+        echo "$(get_timestamp) $(check_file)"
     fi
-    
-    # Sleep for a short interval (0.5 seconds)
-    sleep 0.5
 done
