@@ -3,8 +3,8 @@
 // Protoc plugin that generates Mongoose schemas from protobuf definitions
 // Uses @bufbuild/protoplugin framework
 
-import { createEcmaScriptPlugin, runNodeJs, type Schema } from "@bufbuild/protoplugin";
-import { getOption, hasOption } from "@bufbuild/protobuf";
+import { createEcmaScriptPlugin, GeneratedFile, runNodeJs, type Schema } from "@bufbuild/protoplugin";
+import { DescField, DescFile, DescMessage, getOption, hasOption } from "@bufbuild/protobuf";
 import {
   mongoose_index,
   mongoose_unique,
@@ -36,14 +36,18 @@ function generateTs(schema: Schema) {
 
 runNodeJs(protocGenMongoose);
 
-function generateMongooseSchema(f: any, file: any, message: any) {
+function generateMongooseSchema(
+  f: GeneratedFile,
+  file: DescFile,
+  message: DescMessage
+) {
   f.preamble(file);
   f.print("import {Schema} from 'mongoose';");
   f.print('\n\n');
   f.print(`export const ${message.name}Schema = new Schema({`);
 
   // Generate fields
-  message.fields.forEach((field: any, index: number) => {
+  message.fields.forEach((field, index) => {
     const mongooseType = getMongooseType(field);
     const fieldOptions = getFieldOptions(field);
 
@@ -70,7 +74,7 @@ function generateMongooseSchema(f: any, file: any, message: any) {
   f.print('});');
 }
 
-function getMongooseType(field: any): string {
+function getMongooseType(field: DescField): string {
   switch (field.fieldKind) {
     case "scalar":
       switch (field.scalar) {
@@ -109,7 +113,7 @@ function getMongooseType(field: any): string {
   }
 }
 
-function getFieldOptions(field: any): Record<string, any> {
+function getFieldOptions(field: DescField): Record<string, any> {
   const options: Record<string, any> = {};
 
   // Use the proper protobuf extension API
@@ -126,7 +130,7 @@ function getFieldOptions(field: any): Record<string, any> {
   return options;
 }
 
-function getCollectionName(message: any): string {
+function getCollectionName(message: DescMessage): string {
   // Use the proper protobuf extension API
   if (hasOption(message, mongoose_collection)) {
     return getOption(message, mongoose_collection);
