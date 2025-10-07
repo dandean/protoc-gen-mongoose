@@ -1,0 +1,16 @@
+{
+  "name": "protoc-gen-mongoose",
+  "version": "1.0.0",
+  "scripts": {
+    "generate-schemas": "node plugins/protoc-gen-mongoose/index.js"
+  },
+  "author": "Dan Dean",
+  "license": "MIT",
+  "dependencies": {
+    "@bufbuild/buf": "^1.57.2",
+    "@protobuf-ts/protoc": "^2.11.1",
+    "google-protobuf": "^4.0.0",
+    "mongoose": "^8.19.1",
+    "protobufjs": "^7.5.4"
+  }
+}

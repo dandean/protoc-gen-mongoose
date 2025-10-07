@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+package user.v1;
+
+import "mongoose_options.proto";
+
+message User {
+  option (mongoose.options.mongoose_collection) = "Users";
+  
+  string id = 1 [(mongoose.options.mongoose_unique) = true];
+  string email = 2 [(mongoose.options.mongoose_required) = true];
+  string name = 3 [(mongoose.options.mongoose_index) = true];
+}

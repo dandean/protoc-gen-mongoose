@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package mongoose.options;
+
+import "google/protobuf/descriptor.proto";
+
+extend google.protobuf.FieldOptions {
+  bool mongoose_index = 50001;
+  bool mongoose_unique = 50002;
+  bool mongoose_required = 50003;
+}
+
+extend google.protobuf.MessageOptions {
+  string mongoose_collection = 50001;
+}

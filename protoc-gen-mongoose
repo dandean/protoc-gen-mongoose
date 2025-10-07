@@ -1,0 +1,164 @@
+#!/usr/bin/env node
+
+// Protoc plugin that generates Mongoose schemas from protobuf definitions
+// Reads CodeGeneratorRequest from stdin, writes CodeGeneratorResponse to stdout
+
+const fs = require('fs');
+const path = require('path');
+
+// Read all input from stdin
+let inputData = Buffer.alloc(0);
+
+process.stdin.on('data', (chunk) => {
+  inputData = Buffer.concat([inputData, chunk]);
+});
+
+process.stdin.on('end', () => {
+  try {
+    // Find all .proto files in the proto directory
+    const protoDir = 'proto';
+    const protoFiles = fs.readdirSync(protoDir)
+      .filter(file => file.endsWith('.proto') && !file.includes('options'))
+      .map(file => path.join(protoDir, file));
+
+    // Create output directory
+    if (!fs.existsSync('generated')) {
+      fs.mkdirSync('generated');
+    }
+
+    // Process each proto file
+    protoFiles.forEach(protoFile => {
+      const protoContent = fs.readFileSync(protoFile, 'utf8');
+      const messages = parseProtoFile(protoContent);
+
+      // Generate schema for each message
+      messages.forEach(messageInfo => {
+        const mongooseSchema = generateMongooseSchema(messageInfo);
+        const outputFile = path.join('generated', `${messageInfo.name.toLowerCase()}.js`);
+        fs.writeFileSync(outputFile, mongooseSchema);
+      });
+    });
+
+    // Write empty response to stdout (protoc expects this)
+    process.stdout.write(Buffer.alloc(0));
+
+  } catch (error) {
+    console.error('Plugin error:', error);
+    process.exit(1);
+  }
+});
+
+function parseProtoFile(content) {
+  const lines = content.split('\n');
+  const messages = [];
+  let currentMessage = null;
+  let inMessage = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+
+    // Find message definition
+    const messageMatch = line.match(/^message\s+(\w+)\s*\{/);
+    if (messageMatch) {
+      currentMessage = {
+        name: messageMatch[1],
+        collection: '',
+        fields: []
+      };
+      inMessage = true;
+      continue;
+    }
+
+    // Find collection option
+    const collectionMatch = line.match(/option\s+\(mongoose\.options\.mongoose_collection\)\s*=\s*"([^"]+)"/);
+    if (collectionMatch && currentMessage) {
+      currentMessage.collection = collectionMatch[1];
+      continue;
+    }
+
+    // Find field definitions
+    if (inMessage && currentMessage) {
+      const fieldMatch = line.match(/(\w+)\s+(\w+)\s*=\s*\d+(?:\s*\[(.*?)\])?/);
+      if (fieldMatch) {
+        const [, fieldType, fieldName, annotations] = fieldMatch;
+
+        const field = {
+          name: fieldName,
+          type: fieldType,
+          mongooseOptions: {}
+        };
+
+        // Parse annotations
+        if (annotations) {
+          if (annotations.includes('mongoose_unique') && annotations.includes('true')) {
+            field.mongooseOptions.unique = true;
+          }
+          if (annotations.includes('mongoose_required') && annotations.includes('true')) {
+            field.mongooseOptions.required = true;
+          }
+          if (annotations.includes('mongoose_index') && annotations.includes('true')) {
+            field.mongooseOptions.index = true;
+          }
+        }
+
+        currentMessage.fields.push(field);
+      }
+
+      if (line === '}') {
+        inMessage = false;
+        messages.push(currentMessage);
+        currentMessage = null;
+      }
+    }
+  }
+
+  return messages;
+}
+
+function generateMongooseSchema(messageInfo) {
+  let schema = `const mongoose = require('mongoose');\n\n`;
+  schema += `const ${messageInfo.name}Schema = new mongoose.Schema({\n`;
+
+  // Generate fields
+  messageInfo.fields.forEach((field, index) => {
+    const mongooseType = getMongooseType(field.type);
+
+    if (Object.keys(field.mongooseOptions).length > 0) {
+      schema += `  ${field.name}: {\n`;
+      schema += `    type: ${mongooseType}`;
+
+      Object.entries(field.mongooseOptions).forEach(([key, value]) => {
+        schema += `,\n    ${key}: ${value}`;
+      });
+
+      schema += '\n  }';
+    } else {
+      schema += `  ${field.name}: ${mongooseType}`;
+    }
+
+    if (index < messageInfo.fields.length - 1) {
+      schema += ',';
+    }
+    schema += '\n';
+  });
+
+  schema += '}, {\n';
+  schema += `  collection: '${messageInfo.collection || messageInfo.name.toLowerCase() + 's'}',\n`;
+  schema += '  timestamps: true\n';
+  schema += '});\n\n';
+  schema += `module.exports = mongoose.model('${messageInfo.name}', ${messageInfo.name}Schema);\n`;
+
+  return schema;
+}
+
+function getMongooseType(protoType) {
+  switch (protoType) {
+    case 'string': return 'String';
+    case 'int32':
+    case 'int64':
+    case 'double':
+    case 'float': return 'Number';
+    case 'bool': return 'Boolean';
+    default: return 'String';
+  }
+}
